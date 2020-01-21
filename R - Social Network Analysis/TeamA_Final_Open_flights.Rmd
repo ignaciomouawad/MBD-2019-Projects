@@ -1,0 +1,281 @@
+---
+title: <span style="color:darkblue"> Final Assignment  </span>
+author: Benjamín Chumaceiro | Rosalía Contreras | Eduardo Cort Pons | Maria Joyce | Ignacio Mouawad | Srishti Singh 
+        
+date: "10/24/2019"
+output: html_document
+
+---
+## SOCIAL NETWORKS ANALYSIS
+#### Profesor: ALVARO ROMERO MIRALLES
+#### Program: MBD April intake
+#### Group Final Assignment 
+#### Team A
+
+The following dataset is going to be used:
+* OpenFlights dataset - directed graph - : "The data is downloaded from Openflights.org. a directed network containing flights between airports of the world, in which directed edge represents a flight from one airport to another from the year 2010. Here it has 2939 nodes and 30501 edges. As such, it gives much more of a complete picture and avoids the sample selection. The weights in this network refer to the number of routes between two airports." 
+http://opsahl.co.uk/tnet/datasets/openflights.dl
+
+metadata downloaded from:
+https://openflights.org/data.html
+https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat
+
+some of the airport ids are missing in our data. we assume that these airports can be some priavetely owned airports or military bases, and therefore not included in the airports dataset.
+
+
+We had to download the data and edit the headers for us R to be able to read the
+read_graph( "http://opsahl.co.uk/tnet/datasets/openflights.dl",format = c("dl")) was giving us an error.
+as for the metadata, for readablilty we changed file to csv.
+
+both edited files are in the downloaded folder
+
+# Loading data
+```{r}
+# Set the folder (path) that contains this R file as the working directory
+#dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+#setwd(dir)
+
+library(igraph)
+library(data.table)
+library(stringr)
+library(igraphdata)
+
+openflights <- fread("openflights.dl.tsv", header = F)
+colnames(openflights) <- c("from", "to", "weight")
+metadata <- read.csv("airports.dat.csv", header = T)
+metadata <- metadata
+flights <- graph.data.frame(as.data.frame(openflights)) 
+head(openflights)
+```
+
+# Summary Analysis
+```{r}
+summary(flights)
+```
+
+The summary of this graph describes the graph as directed named and weighted. The graph has 2,939 nodes with 30,501 edges. 
+The name attribute is a vertex of character type, while the weight attribute is an edge level numeric attribute.
+
+# Degree distribution
+
+Since our graph is a directed graph, we will look at the total degree distribution considering the graph as undirected.
+Then we will look at the in-degree and out-degree distributions to better understand the graph at hand, also looking at the mean and standard deviation.
+### Directed Flights Graph total-degree distribution
+```{r}
+deg <- degree(as.undirected(flights), mode="total")
+hist(deg, main="Histogram of Total node degree",xlim=c(0,50), ylim=c(0,1500),breaks = 100)
+deg.dist <- degree_distribution(as.undirected(flights), cumulative=T, mode="total")
+plot( x=0:max(deg), y=1-deg.dist, pch=19, cex=1.2, col="orange", 
+      xlab="Degree", ylab="Cumulative Frequency for total degree", xlim = c(0,100))
+sprintf("mean: %f",mean(deg))
+sprintf("sd: %f",sd(deg))
+```
+### Directed Flights Graph in-degree distribution
+```{r}
+deg <- degree(as.directed(flights), mode="in")
+hist(deg, main="Histogram of Total node degree",xlim=c(0,50), ylim=c(0,1500),breaks = 100)
+deg.dist <- degree_distribution(flights, cumulative=T, mode="in")
+plot( x=0:max(deg), y=1-deg.dist, pch=19, cex=1.2, col="orange", 
+      xlab="Degree", ylab="Cumulative Frequency for in degree", xlim = c(0,100))
+sprintf("mean: %f",mean(deg))
+sprintf("sd: %f",sd(deg))
+```
+### Directed Flights Graph out-degree distribution
+```{r}
+deg <- degree(as.directed(flights), mode="out")
+hist(deg, main="Histogram of Total node degree",xlim=c(0,50), ylim=c(0,1500),breaks = 100)
+deg.dist <- degree_distribution(flights, cumulative=T, mode="out")
+plot( x=0:max(deg), y=1-deg.dist, pch=19, cex=1.2, col="orange", 
+      xlab="Degree", ylab="Cumulative Frequency for out degree", xlim = c(0,100))
+
+sprintf("mean: %f",mean(deg))
+sprintf("sd: %f",sd(deg))
+```
+As we can see from the charts, our network exhibits a longtail kind of chart. This reflects the fact that many of the airports in our dataset are either really small local airports or privately owned airports. The nodes that show bigger degrees are those  that are internarional airports connecting major cities together and with the rest of the world. The biggest airports tend to have a lot of edges, with even higher weights, causing the skewness in the node distribution. Since our graph is directed, it reflects the in degrees reflect the amount of flights towarrds that airport, while the out degree describes the outbound flights. 
+#### Network Diameter
+Network Diameter, Average Path Length, and the clustering coeffecient without considering weights
+```{r}
+
+sprintf("Flights Network diameter: %d",diameter(flights, directed=T, weights = NA))
+print("this is the shortest path, using airport ids, from to go from id 5522 to 7340")
+E(flights, path=get_diameter(flights))
+
+sprintf("Flights Network Average Path Length: %f",mean_distance(flights, directed=T))
+```
+
+The diameter represents the largerst shortest path in our network! that means, that means the most this is the minimus distance you have to travel, minimum number of airports you have to pass through, if youre willing to take connection flights only to go from one end to the other.
+
+This is a plot of the diameter, or largest shortest distance
+```{r}
+diam <- get_diameter(flights, directed=T)
+source_diameter <- as.character(metadata[metadata$id == 5522, "city"])
+target_diameter <-as.character(metadata[metadata$id == 5621, "city"])
+
+sprintf("Going from %s", source_diameter)
+sprintf("to %s",target_diameter)
+sprintf("we have to pass through %s airports!",diameter(flights)-1) #since the last furthermost id does not have a matching name in our airports metadata dataset.
+
+vcol <- rep("gray40", vcount(flights))
+vcol[diam] <- "gold"
+ecol <- rep("gray80", ecount(flights))
+ecol[E(flights, path=diam)] <- "orange"
+E(flights, path=diam) # finds edges along a path, here 'diam'
+plot(flights, vertex.color=vcol, edge.color=ecol, edge.arrow.mode=0, vertex.label= NA)
+```
+
+
+Calculating the Local and Global clustering coeefecients
+```{r}
+sprintf("Flights Network Clustering Coefficient: %f",transitivity(as.undirected(flights),type="global", weights = NA))
+sprintf("Flights Network Graph average local clustering coefficient: %f",mean(transitivity(as.directed(flights),type="local", weights = NA), na.rm = T))
+
+```
+
+
+
+# Node importance: Centrality measures
+```{r}
+deg <- degree(flights, mode="total")
+btw <-betweenness(flights)
+cls <-closeness(flights)
+
+
+```
+
+```{r}
+
+centrality_table <- cbind(deg, btw, cls)
+centrality_table <- as.data.frame(centrality_table)
+centrality_table <- setDT(centrality_table, keep.rownames = TRUE)[]
+centrality_table$rn <- as.numeric(centrality_table$rn)
+centrality_table <- merge(centrality_table,metadata, by.x = "rn",by.y = "id", all = T)
+```
+### Ranking Top 20 nodes based with highest Degree
+```{r}
+centrality_table[order(centrality_table$deg, decreasing = T),][1:20]
+```
+![Gephi Graphs](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/degree.png)
+### Ranking Top 20 nodes based with highest Betweeness Centrality
+```{r}
+centrality_table[order(centrality_table$btw, decreasing = T),][1:30]
+```
+
+![Gephi Graphs](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/Betweenness.png)
+
+The interesting point taken in this chart is Anchorage, Alaska. Although geographically one would think that maybe this has high betweeness as it acts a bridge between the far east and the west coast of the USA, this is not the case. After further analysis, this node acts as a bridge connecting all Alaskan airports and some Canadian airports to the rest of the USA, and therefore the rest of the world.
+
+### Ranking Top 20 nodes based with highest Closeness Centrality
+```{r}
+centrality_table[order(centrality_table$cls, decreasing = T),][1:30]
+
+```
+
+However, here we decided to look further into the cities, and decided to join arirports from the same cities. 
+```{r}
+citiesgraph <- graph.data.frame(fread("citiesgraph.csv"))
+cls <-closeness(citiesgraph)
+```
+```{r}
+sort(cls, decreasing = T)[1:20]
+
+```
+
+
+
+![Gephi Graphs](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/Centrality.png)
+
+Now after joining cities together, we see that London overtook Frankfurt. This makes semse, as frankfurt has only 2 airports, and is not even the capital of the country. 2 major world airports are not far away in the same country (Munich and Berlin). whereas London has around 5 airports for internal flights within the UK, low cost flights within Europe.
+
+#Clustering Community Detection
+![Gephi Graphs](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/Clustered_ForceAtlas.png)
+
+When we clustered using modulariy coeficient on Gephi, we the following clusters. 
+We then decided to see the geographical location of the nodes represented in theses clusters to be able to visualize and understand fully the results.
+
+![Gephi Graphs](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/Clustered_GeoLayout.png)
+
+Not surprisingle, the clusters where close to each other geographically. This makes complete sense, since airports with the same continents tend to be more connected to each other. Although we have some countries belonging to different continents in the same cluster, this reinforces the connections between the airports in those countries. The most obvious examples are the ones of the northern countries of south america. The cluster points out that Venezuela is might be well connected to US states. Other isolates such as Canada and Alaska reinforce the idea of communities within each other. The clusters can be labeled as North America, South America, Europe, Africa, Middle East India, Far Easr Asia, Oceania, Central Asia.
+
+It is easy to distinguish clusters when they are spreaded across the map, however, lets look at them now without using the geo-layout plugin.
+![Gephi Graphs](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/understanding_clusters_GeoLayout.png)
+
+The clusters here appear in a different way. We can deduce that South America, Africa and the Middle East, are connected to the rest of the world by few hubs like Sao Paolo, Cairo and Marakesh, Dubai respectively. Those are the nodes or cities in that case that connects these geogrpahical locations to other areas. Whereas we can see that Europel, lying there in the middle is more attached to the entire world!  As we analyzed before that nodes with highest degrees and many of thise in the top of the betweenness table belong to Europe. Geographicall speaking, it also makes sense. Europe is closer to the 6 all the main regions than other areas around the globe. 
+
+
+
+
+# 4. Community detection
+
+
+Calculate the clusters using louvain algorithm.
+```{r}
+cl <- cluster_louvain(as.undirected(flights))
+
+plot(cl, as.undirected(flights), vertex.label =NA)
+```
+
+```{r}
+modularity(cl)
+```
+
+
+
+```{r}
+cfg <- cluster_fast_greedy(as.undirected(flights))
+
+plot(cfg, as.undirected(flights), vertex.label = NA)
+```
+
+
+
+```{r}
+modularity(cfg)
+```
+
+Community detection based on based on propagating labels
+Assigns node labels, randomizes, than replaces each vertex’s label with the label that appears most
+frequently among neighbors. Those steps are repeated until each vertex has the most common label
+of its neighbors.
+
+```{r}
+clp <- cluster_label_prop(as.undirected(citiesgraph))
+plot(clp, as.undirected(citiesgraph), vertex.label = NA)
+```
+
+```{r}
+colrs <- adjustcolor( c("gray50", "tomato", "gold", "yellowgreen"), alpha=.6)
+kc <- coreness(flights, mode="all")
+plot(flights, vertex.size=kc*6, vertex.label=kc, vertex.color=colrs[kc], vertex.label = NA)
+```
+
+```{r}
+LouvainCluster <- cluster_louvain(as.undirected(flights))
+plot(LouvainCluster, as.undirected(flights))
+#Community detection based on greedy optimization of modularity
+cfg <- cluster_fast_greedy(as.undirected(flights))
+plot(cfg, as.undirected(flights), vertex.labels = NA)
+```
+
+
+
+
+
+
+# How to use this data
+
+Airports have huge impact on the countries economy. It brings in Revenues from airport taxes and from commerical spendings inside the airport shops. We want to implement our insights to help take advantage of the benefits and maybe help cities grow and maximixe their potential Revenues and economic impacts by giving suggestions on how to leverage this graph Network.
+
+First, let us understand the impact of airports on the economy by looking at numbers.
+![Revenues](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/airport_revenues.png)
+
+We see that in 2018, Spain lied second by revenues generated from airports. However we believe that this is not enough. Spain is not living up to its potential.
+
+![Number of Passengers](/Users/ignac/Desktop/ie/mbd term 2/social network analysis/final version assignment/airport_passengers.png)
+
+We would like to show our support for building another airport here in Madrid, do that Spain to be part of this list on the upcoming years.
+From our experience as citizrns of Madrid, the Barajas Airport is relatively expensive. Flights to major world cities, specially neighbooring cities are relatively more expensive here in Madrid, when compared to other major European cities, and even other Spanish Airports.
+
+We believe, if Spain successfully leverages its political connections and uses its geographical location to its advantage, it can make Madrid a bigger hub for travelling passengers. Politically, Spain has very strong relationships with South American countries. Geographically, Spain is the closest European country to Africa. As we saw previously in our charts, Africa and South America are not as strongly connected to the rest of the world, in comparison to other continents. 
+
+Building a new airport can free up Barajas and transform into a bigger betweenness hub. A new airport focused on cheap local and regional flights has many advantages. The amount invested in building a new airport is huge enough to boost the Madrid economy. Several job oportunites will be available at the disposal of the people of Madrid. Increased local and regional toursim plus increased airport taxes will have a positive impact on the entire city in general. Now, Barajas can be transformed into an International Betweenness airport, catching up with neighbouring cities such as Frankfurt, Paris, and London. 
+

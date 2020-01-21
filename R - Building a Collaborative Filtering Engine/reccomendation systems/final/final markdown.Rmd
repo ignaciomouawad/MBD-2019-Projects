@@ -1,0 +1,399 @@
+
+```{r}
+library(data.table)
+library(lsa)
+plays <- read.csv("C:\\Users/ignac/Desktop/ie/mbd term 2/reccomendation systems/final/play.csv")
+set.seed(143)
+
+```
+
+```{r}
+user1 <- sample(0:5,20, replace = T)
+user2 <- sample(0:5,20, replace = T)
+user3 <- sample(0:5,20, replace = T)
+user4 <- sample(0:5,20, replace = T)
+user5 <- sample(0:5,20, replace = T)
+user6 <- sample(0:5,20, replace = T)
+user7 <- sample(0:5,20, replace = T)
+user8 <- sample(0:5,20, replace = T)
+user9 <- sample(0:5,20, replace = T)
+user10 <- sample(0:5,20, replace = T)
+
+users <- data.frame(user1,user2,user3,user4,user5,  user6,user7,user8,user9,user10)
+rownames(plays) <- plays[,1]
+plays[,1]<-NULL
+users[users==0]<-NA
+rownames(users) <- rownames(plays)
+users
+
+
+
+critic1 <- sample(0:5,20, replace = T)
+critic2 <- sample(0:5,20, replace = T)
+critic3 <- sample(0:5,20, replace = T)
+critic4 <- sample(0:5,20, replace = T)
+critic5 <- sample(0:5,20, replace = T)
+critic6 <- sample(0:5,20, replace = T)
+critic7 <- sample(0:5,20, replace = T)
+critic8 <- sample(0:5,20, replace = T)
+critic9 <- sample(0:5,20, replace = T)
+critic10 <- sample(0:5,20, replace = T)
+
+
+top_critics <- data.frame(critic1, critic2, critic3, critic4, critic5, critic6,critic7,critic8,critic9,critic10)
+rownames(top_critics) <- rownames(plays)
+top_critics[top_critics==0]<-NA
+top_critics
+
+friend1 <- sample(0:5,20, replace = T)
+friend2 <- sample(0:5,20, replace = T)
+friend3 <- sample(0:5,20, replace = T)
+friend4 <- sample(0:5,20, replace = T)
+friend5 <- sample(0:5,20, replace = T)
+friend6 <- sample(0:5,20, replace = T)
+friend7 <- sample(0:5,20, replace = T)
+friend8 <- sample(0:5,20, replace = T)
+friend9 <- sample(0:5,20, replace = T)
+friend10 <- sample(0:5,20, replace = T)
+
+friends <- data.frame(friend1, friend2, friend3, friend4, friend5, friend6,friend7,friend8,friend9,friend10)
+rownames(friends) <- rownames(plays)
+friends[friends==0]<-NA
+friends
+
+
+
+
+likes_dislikes <- function(x){x[x<=2] <- -1
+                              x[x==3 | is.na(x)] <- 0
+                              x[x>=4] <- 1
+                              return(x)}
+
+likes_table <- as.data.frame(cbind(likes_dislikes(user1), likes_dislikes(user2), likes_dislikes(user3), likes_dislikes(user4), likes_dislikes(user5),likes_dislikes(user6), likes_dislikes(user7), likes_dislikes(user8), likes_dislikes(user9), likes_dislikes(user10)))
+
+rownames(likes_table) <- rownames(plays)
+colnames(likes_table) <- colnames(users)
+likes_table
+
+```
+
+### Cold Start Case
+
+## Top 5 Plays, by rating mean based on all users and critics
+```{r}
+playtable <- cbind(users,friends,top_critics)
+mean_ratings <- sort(rowMeans(playtable, na.rm = T), decreasing = T)
+as.data.frame(mean_ratings[1:5])
+```
+
+## Top 5 Plays, by rating distribution based on critics
+```{r}
+playtable <- cbind(users,friends,top_critics)
+topperc <- sort(apply(top_critics,1,function(x) sum(x>=4, na.rm=T)/sum(x>=0, na.rm=T)),decreasing=T)
+as.data.frame(topperc[1:5]) 
+```
+## Rating distribution based on all users and critics
+```{r}
+playtable <- cbind(users,friends,top_critics)
+topperc <- sort(apply(playtable,1,function(x) sum(x>=4, na.rm=T)/sum(x>=0, na.rm=T)),decreasing=T)
+as.data.frame(topperc[1:6]) 
+```
+
+## Top 5 Plays, by rating distribution based on critics and all users
+```{r}
+playtable <- cbind(users,friends,top_critics)
+topperc <- sort(apply(playtable,1,function(x) sum(x>=4, na.rm=T)/sum(x>=0, na.rm=T)),decreasing=T)
+top_rec <- as.data.frame(topperc[1:5]) 
+colnames(top_rec) <- "rating distribution"
+top_rec
+```
+
+
+
+
+
+## People who watched this play also watched this:
+
+```{r}
+topocc <- function(a){
+  
+  playtable <- as.data.frame(transpose(cbind(users,friends,top_critics)))
+  colnames(playtable)<-rownames(plays)
+  
+  
+  playtable <- as.data.table(playtable)[playtable[,a]!=0]
+  x<- sort((nrow(playtable)+(apply(playtable[,-(as.integer(grep("DoÃ±a Rosita la soltera",colnames(playtable))))], 2,function(a){sum(a!=0, na.rm = T)})))/nrow(playtable)-1, decreasing = T)[2:6]
+  x<- data.frame(x)
+  colnames(x) <- sprintf("top occurances with %s",a)
+  return(x)
+}
+#topocc("DoÃ±a Rosita la soltera")
+
+```
+
+
+## People who liked this play also liked ...
+
+```{r}
+basedonlike <- function(a){
+  playtable <- as.data.frame(transpose(cbind(users,friends,top_critics)))
+  colnames(playtable)<-rownames(plays)
+
+  playtable <- playtable[playtable[,a]==4 | playtable[,a] == 5,]
+  
+  playtable[,a] <- NULL
+  x <- sort(sapply(playtable, function(x)({mean(x, na.rm = T)})), decreasing = T)
+  x <- as.data.frame(x[1:5])
+  colnames(x) <- sprintf("people who liked this %s also liked this",a)
+  return(x)
+}
+
+basedonlike("El Rey Leon")
+```
+
+
+# collaborative filtering
+## top recommendations
+```{r}
+playtable <- cbind(users,friends,top_critics)
+
+ 
+
+
+formvect <- vector()
+sumformvect <- vector()
+absvect <- vector()
+sumabsvect <- vector()
+user1ratings <- vector()
+user1_avg <- mean(playtable$user1, na.rm = T)
+sumabs <- sum(abs(sapply(playtable,function(a){cor(a,playtable$user1, use = "complete.obs")})))
+
+
+
+
+
+for (play in 1:nrow(playtable)) {
+  for(user in 1:ncol(playtable)){
+    rum <- playtable[play,user]
+    ravg <- mean(playtable[,user], na.rm = T)
+    if(is.na(rum)==T| identical(playtable$user1, playtable[,play])){form <- 0}
+    else{
+      wau <- cor(playtable$user1,playtable[,2], use = "complete.obs")
+      
+      form <- (rum - ravg)*wau
+      
+    }
+    formvect[user] <- form
+    
+    
+  }
+  sumformvect[play]<- sum(formvect, na.rm = T)
+  
+  user1ratings[play] <- user1_avg + (sumformvect[play]/sumabs)
+}
+
+xy <- data.table(cbind(user1ratings, rownames(plays)))
+names(xy)[names(xy) == "V2"] <- "weighted rating"
+xy[order(xy$user1ratings, decreasing = T),1:2][1:5]
+```
+
+
+## building users profiles 
+## Simple Unary
+### user profile
+```{r}
+simple_unary_user_profile <- data.frame()
+for(k in 1:ncol(likes_table)){
+  j<- vector()
+  for(i in 1:ncol(plays)){
+    j[i]<- sum(plays[,i]*likes_table[,k], na.rm = T)
+  }
+  simple_unary_user_profile<-rbind(simple_unary_user_profile,j)
+
+}
+
+colnames(simple_unary_user_profile)<-colnames(plays)
+rownames(simple_unary_user_profile) <- colnames(likes_table)
+simple_unary_user_profile
+
+
+unary_predict_table <- data.frame()
+
+
+for(i in 1:nrow(simple_unary_user_profile)){
+  for(k in 1:nrow(plays)){
+    plays[is.na(plays)] <- 0
+    unary_predict_table[k,i]<- cosine(as.numeric(plays[k,]),as.numeric(simple_unary_user_profile[i,]))
+    #unary_predict_table[1,1]<- cosine(as.numeric(plays[1,]),as.numeric(simple_unary_user_profile[1,]))
+  }
+}
+colnames(unary_predict_table) <- rownames(simple_unary_user_profile)
+unary_predict_table
+
+likes_dislikes <- rbind(sapply(unary_predict_table, function(x){sum(x>0)}))
+likes_dislikes <- rbind(likes_dislikes,sapply(unary_predict_table, function(x){sum(x<0)}))
+likes_dislikes <- rbind(likes_dislikes,sapply(unary_predict_table, function(x){sum(x==0)}))
+rownames(likes_dislikes) <- c("likes", "dislikes","neutral")
+likes_dislikes
+
+
+
+
+```
+
+
+```{r}
+CB_unit_weight <- data.frame()
+
+for(k in 1:nrow(plays)){
+  for(i in 1:ncol(plays)){
+    CB_unit_weight[k,i] <- plays[k,i]/sum(plays[k,]) 
+  }
+}
+
+unit_weight_user_profile <- data.frame()
+for(k in 1:ncol(likes_table)){
+  j<- vector()
+  for(i in 1:ncol(CB_unit_weight)){
+    j[i]<- sum(CB_unit_weight[,i]*likes_table[,k], na.rm = T)
+  }
+  unit_weight_user_profile<-rbind(unit_weight_user_profile,j)
+  
+}
+
+colnames(unit_weight_user_profile)<-colnames(plays)
+rownames(unit_weight_user_profile) <- colnames(users)
+unit_weight_user_profile
+
+
+
+
+unit_weight_predict_table <- data.frame()
+
+for(i in 1:nrow(unit_weight_user_profile)){
+  for(k in 1:nrow(plays)){
+    unit_weight_predict_table[k,i]<- cosine(as.numeric(CB_unit_weight[k,]),as.numeric(unit_weight_user_profile[i,]))
+  
+  }
+}
+colnames(unit_weight_predict_table) <- rownames(simple_unary_user_profile)
+rownames(unit_weight_predict_table) <- rownames(plays)
+
+unit_weight_predict_table
+
+
+likes_dislikes <- rbind(sapply(unit_weight_predict_table, function(x){sum(x>0)}))
+likes_dislikes <- rbind(likes_dislikes,sapply(unit_weight_predict_table, function(x){sum(x<0)}))
+likes_dislikes <- rbind(likes_dislikes,sapply(unit_weight_predict_table, function(x){sum(x==0)}))
+rownames(likes_dislikes) <- c("likes", "dislikes","neutral")
+likes_dislikes
+```
+
+## idf
+```{r}
+df <- sapply(plays,sum)
+as.data.frame(df)
+```
+```{r}
+idf <- log10(nrow(plays)/df)
+
+as.data.frame(idf)
+```
+
+```{r}
+
+
+idf_user_profile <- data.frame()
+for(i in 1:nrow(unit_weight_user_profile)){
+  idf_user_profile <- rbind(idf_user_profile,idf*unit_weight_user_profile[i,])
+}
+idf_user_profile
+```
+
+
+
+```{r}
+idf_predict_table <- data.frame()
+
+
+for(i in 1:nrow(unit_weight_user_profile)){
+  for(k in 1:nrow(plays)){
+    idf_predict_table[k,i]<- cosine(as.numeric(plays[k,]),as.numeric(idf_user_profile[i,]))
+  
+  }
+}
+colnames(idf_predict_table) <- rownames(simple_unary_user_profile)
+rownames(idf_predict_table) <- rownames(plays)
+idf_predict_table
+
+```
+
+
+```{r}
+
+likes_dislikes <- rbind(sapply(idf_predict_table, function(x){sum(x>0)}))
+likes_dislikes <- rbind(likes_dislikes,sapply(idf_predict_table, function(x){sum(x<0)}))
+likes_dislikes <- rbind(likes_dislikes,sapply(idf_predict_table, function(x){sum(x==0)}))
+rownames(likes_dislikes) <- c("likes", "dislikes","neutral")
+likes_dislikes
+```
+
+```{r}
+
+# top predicted Plays for user 5
+xy <- data.table(cbind(idf_predict_table$user5, rownames(plays)))
+names(xy)[names(xy) == "V1"] <- "weighted rating"
+names(xy)[names(xy) == "V2"] <- "play"
+  xy[order(xy$`weighted rating`, decreasing = T),1:2][1:5]
+
+```
+
+```{r}
+plays[plays$classic!=0,]["classic"]
+```
+## Evaluation Methods
+```{r}
+library(DescTools)
+library(rrecsys)
+```
+
+
+
+# 1) Evaluating predictions (MAE, MSE, RMSE) using Error ratings average
+Combine all users predictions and observations and calculate the MAE, the MSE and the RMSE. 
+Use : MAE(real,pred,na.rm.T)
+What's the system status?
+
+```{r fig.width=7, fig.height=6}
+# Combine all users in one vector
+all_real <- c(user1,user2,user3,user4,user5,  user6,user7,user8,user9,user10)
+all_pred <- c(idf_predict_table$user1,idf_predict_table$user2,idf_predict_table$user3,idf_predict_table$user4,idf_predict_table$user5,  idf_predict_table$user6,idf_predict_table$user7,idf_predict_table$user8,idf_predict_table$user9,idf_predict_table$user10)
+
+sprintf("Mean Absolute Error: %s", MAE(all_real,all_pred, na.rm = T))
+sprintf("Mean Square Error: %s",MSE(all_real,all_pred, na.rm = T))
+sprintf("Root Mean Square Error: %s",RMSE(all_real,all_pred, na.rm = T))
+```
+```{r fig.width=7, fig.height=6}
+# Combine all users in one vector
+all_real <- c(user1)
+all_pred <- c(user1ratings)
+
+sprintf("Mean Absolute Error: %s", MAE(all_real,all_pred, na.rm = T))
+sprintf("Mean Square Error: %s",MSE(all_real,all_pred, na.rm = T))
+sprintf("Root Mean Square Error: %s",RMSE(all_real,all_pred, na.rm = T))
+```
+
+
+# 2) Evaluating Users ratings average predictions, only considering RMSE
+Calculate the users ratings RMSE average. Consider each user's RSME separately and then do the average of the 3 RMSEs. 
+What this discrepancy means with the previous RMSE? Compare Sophia RMSE with Ivan RMSE, what it means?
+```{r fig.width=7, fig.height=6}
+rmse_sophia <- RMSE(sophia_real, sophia_pred, na.rm = T) ;
+rmse_sophia ;
+rmse_maria <- RMSE(maria_real, maria_pred, na.rm = T) ;
+rmse_maria ;
+rmse_ivan <- RMSE(ivan_real, ivan_pred, na.rm = T) ;
+rmse_ivan;
+
+mean(c(rmse_ivan,rmse_maria,rmse_sophia))
+```

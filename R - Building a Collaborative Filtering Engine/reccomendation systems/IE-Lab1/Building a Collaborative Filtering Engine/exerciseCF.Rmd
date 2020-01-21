@@ -1,0 +1,137 @@
+# IE - Master in Business Analytics and Big Data
+Recommendation Systems
+
+Building a Collaborative Filtering Engine
+
+Author: Ignacio Mouawad
+
+========================================================
+
+# Initialization
+
+Import libraries and Load  critics dataset.
+
+
+```{r}
+library(data.table)
+root_path <- "C:/Users/ignac/Desktop/ie/mbd term 2/reccomendation systems/IE-Lab1/Data/"
+critics <- read.csv(file.path(root_path, "critics.csv"));
+
+```
+
+
+
+# 1) Pearson correlation coefficient 
+Calculate the Pearson correlation coefficient between Sophia and Nuria
+
+**Expected correlation between Sophia and Nuria**: 0.3651484
+
+```{r fig.width=7, fig.height=6}
+tran_critics <- transpose(critics)
+colnames(tran_critics)<-critics[,1]
+rownames(tran_critics)<- colnames(critics)
+tran_critics <- tran_critics[2:nrow(tran_critics),]  #this creates a transposed table of critics with users as col names and movies as row names
+cor(as.numeric(tran_critics$Nuria),as.numeric(tran_critics$Sophia), use = "complete.obs", method = "pearson")
+#this is to calculate the pearson corellation, aand using complete.obs to neglect the nas.
+```
+
+# 2) Compare two movie critics
+Using the calculated Pearson correlation in the previous section. Compare and show the movie ratings for Sophia and Nuria on a scatter plot. How is this compared with the same ratings of Maria and Nerea on a scatter plot? What about Chris and Jim? What it means?
+```{r}
+tran_critics <-as.data.frame(sapply(tran_critics, as.numeric)) #we need to change them from atomic vectors to numeric
+plot(tran_critics$Sophia,tran_critics$Nuria, xlab = "Sophia", ylab = "Nuria", main = "Sophia vs Nuria") #this plots Nuria vs Maria   
+abline(lm(tran_critics$Nuria~tran_critics$Sophia)) #adds the linear model trend line
+plot(tran_critics$Maria,tran_critics$Nerea, xlab = "Maria", ylab = "Neria", main = "Maria vs Nerea")
+abline(lm(tran_critics$Nerea~tran_critics$Maria))
+plot(tran_critics$Chris,tran_critics$Jim, xlab = "Chris", ylab = "Jim", main = "Chris vs Jim")
+abline(lm(tran_critics$Jim~tran_critics$Chris))
+```
+
+# 3) Top Recommendations 
+Return the top-5 recommended movies for Sophia Use the weighted average of every other critic's rankings.
+
+**Expected result**:
+3.7917013044215, 'The Matrix'
+3.50776533175371, 'Forrest Gump'     
+3.33118834864677, 'The Sixth Sense' 
+3.11491825315719, 'Shakespeare in Love'
+2.9124513228665, 'Blade Runner'
+
+```{r fig.width=7, fig.height=6}
+formvect <- vector() #creates empty vector to sore values of the rui-rbar*wau for each user
+sumformvect <- vector()  # creates empty vector to store sum of rui-rbar*wau for each movie
+absvect <- vector()
+sumabsvect <- vector()
+sophiaratings <- vector()#creates empty vector to get the recommended movies ratings
+sophia_avg <- mean(tran_critics$Sophia, na.rm = T)
+
+
+
+formvect <- vector()
+sumformvect <- vector()
+absvect <- vector()
+sumabsvect <- vector()
+sophiaratings <- vector()
+sophia_avg <- mean(tran_critics$Sophia, na.rm = T)
+
+
+
+
+for (movie in 1:ncol(tran_critics)) {
+  for(user in 1:nrow(tran_critics)){
+    rum <- tran_critics[movie,user]
+    ravg <- mean(tran_critics[,user], na.rm = T)
+    if(is.na(rum)==T| identical(tran_critics$Sophia, tran_critics[,user])){form <- 0}
+    else{
+      wau <- cor(tran_critics$Sophia,tran_critics[,user], use = "complete.obs")
+      
+      form <- (rum - ravg)*wau
+      
+    }
+    formvect[user] <- form
+    absvect[user] <- (wau) 
+    
+  }
+  sumformvect[movie]<- sum(formvect, na.rm = T)
+  sumabsvect[movie]<- sum(abs(absvect), na.rm = T)
+  sophiaratings[movie] <- sophia_avg + (sumformvect[movie]/6.928035)
+}
+
+tran_critics$Sophia
+tran_critics$ratings <- sophiaratings
+rownames(tran_critics)<- colnames(critics)[2:ncol(critics)]
+xy <-tran_critics[is.na(tran_critics$Sophia)==T,]
+xy <- xy[order(xy$ratings, decreasing = T),]
+xy <- xy[,c(15,ncol(xy))]
+xy[2]
+```
+
+# 4) Top similar critics
+Return the top 5 critics that are most similar to Sophia. 
+
+**Expected result**:
+0.9449112, 'Rachel'
+0.5976143, 'Ana' 
+0.5789794, 'Oriol'
+0.4925922, 'Maria'
+0.4273247, 'Carles'
+
+```{r fig.width=7, fig.height=6}
+similar_users <- vector()
+for(user in 1:ncol(transpose(critics))){
+  if(identical(tran_critics$Sophia,tran_critics[,user])){
+    next
+  }else{
+  xrr <- (cor(tran_critics$Sophia, tran_critics[,user], use = "complete.obs", method = "pearson" ))
+  }
+  similar_users[user] <- xrr
+}
+xj <- as.data.frame(similar_users)
+xj$names <- critics$User
+xj <- xj[order(similar_users, decreasing = T, na.last = T),]
+rownames(xj)<-NULL
+
+xj <- xj[1:5,1:2]
+rownames(xj) <- xj$similar_users
+as.matrix(xj[2])
+```
